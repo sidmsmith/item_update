@@ -30,7 +30,7 @@ npm run dev
 
 ### Deployment
 
-Configured for Vercel. Push to GitHub and connect the repo to Vercel.
+Configured for Vercel. Push to GitHub and connect the repo to Vercel. Use the **main** branch.
 
 ## API
 
