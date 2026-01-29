@@ -16,6 +16,15 @@ const modalBackdrop = document.getElementById('modalBackdrop');
 const errorModal = document.getElementById('errorModal');
 const errorModalMessage = document.getElementById('errorModalMessage');
 const errorModalCloseBtn = document.getElementById('errorModalCloseBtn');
+const itemInfo = document.getElementById('itemInfo');
+const itemIdEl = document.getElementById('itemId');
+const itemDescriptionEl = document.getElementById('itemDescription');
+const itemOriginalLengthEl = document.getElementById('itemOriginalLength');
+const itemOriginalWidthEl = document.getElementById('itemOriginalWidth');
+const itemOriginalHeightEl = document.getElementById('itemOriginalHeight');
+const itemOriginalWeightEl = document.getElementById('itemOriginalWeight');
+const noImagePlaceholder = document.getElementById('noImagePlaceholder');
+const itemImage = document.getElementById('itemImage');
 
 let token = null;
 let currentOrg = null;
@@ -251,8 +260,9 @@ async function authenticate() {
 
     if (window.urlItem) {
       itemInput.value = window.urlItem;
+      const prefill = window.urlItem;
       window.urlItem = null;
-      itemInput.focus();
+      setTimeout(() => searchItem(prefill), 300);
     }
   } catch (error) {
     console.error('Authentication error:', error);
@@ -270,15 +280,66 @@ async function authenticate() {
   }
 }
 
-function processItem(item) {
+function setItemImage(url) {
+  if (!itemImage || !noImagePlaceholder) return;
+  const u = (url != null && url !== '') ? String(url).trim() : '';
+  if (u) {
+    noImagePlaceholder.style.display = 'none';
+    itemImage.alt = 'Item image';
+    itemImage.src = u;
+    itemImage.style.display = 'block';
+    itemImage.onerror = () => {
+      itemImage.style.display = 'none';
+      itemImage.removeAttribute('src');
+      noImagePlaceholder.style.display = 'flex';
+    };
+  } else {
+    itemImage.style.display = 'none';
+    itemImage.removeAttribute('src');
+    itemImage.onerror = null;
+    noImagePlaceholder.style.display = 'flex';
+  }
+}
+
+function populateItemFields(item) {
+  const v = (x) => (x == null || x === undefined ? '' : String(x));
+  if (itemIdEl) itemIdEl.value = v(item.ItemId);
+  if (itemDescriptionEl) itemDescriptionEl.value = v(item.Description);
+  if (itemOriginalLengthEl) itemOriginalLengthEl.value = v(item.OriginalLength);
+  if (itemOriginalWidthEl) itemOriginalWidthEl.value = v(item.OriginalWidth);
+  if (itemOriginalHeightEl) itemOriginalHeightEl.value = v(item.OriginalHeight);
+  if (itemOriginalWeightEl) itemOriginalWeightEl.value = v(item.OriginalWeight);
+  setItemImage(item.ImageUrl);
+}
+
+async function searchItem(item) {
   const v = (item || '').trim();
   if (!v) {
     showStatus('Please enter or scan an item', 'error');
     return;
   }
   itemInput.value = v;
-  showStatus(`Item entered: ${v}`, 'info');
-  itemInput.focus();
+  showStatus('Searching item...', 'info');
+  if (itemInfo) itemInfo.style.display = 'none';
+
+  try {
+    const res = await apiCall('search_item', { org: currentOrg, itemId: v });
+    if (!res.success) {
+      showStatus(res.error || 'Item not found', 'error');
+      itemInfo.style.display = 'none';
+      itemInput.focus();
+      return;
+    }
+    populateItemFields(res.item);
+    if (itemInfo) itemInfo.style.display = 'block';
+    hideStatus();
+    itemInput.focus();
+  } catch (err) {
+    console.error('Item search error:', err);
+    showStatus(err.message || 'Search failed', 'error');
+    if (itemInfo) itemInfo.style.display = 'none';
+    itemInput.focus();
+  }
 }
 
 function initBarcodeScanner() {
@@ -375,7 +436,7 @@ function processScannedCode(code, source) {
   });
   if (code.length > 0 && /^[A-Z0-9]+$/i.test(code)) {
     closeCamera();
-    processItem(code);
+    searchItem(code);
   } else {
     showStatus(`Scanned: "${code}" – Does not look like a valid item. Try again.`, 'error');
   }
@@ -542,7 +603,7 @@ orgInput.addEventListener('keypress', (e) => {
 });
 
 itemInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') processItem(itemInput.value);
+  if (e.key === 'Enter') searchItem(itemInput.value);
 });
 
 cameraBtn.addEventListener('click', openCamera);
