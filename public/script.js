@@ -297,19 +297,29 @@ function setItemImage(url) {
   if (previewOverlay) previewOverlay.style.display = 'none';
   const u = (url != null && url !== '') ? String(url).trim() : '';
   if (u) {
-    noImagePlaceholder.style.display = 'none';
+    itemImage.style.display = 'none';
+    itemImage.removeAttribute('src');
     itemImage.alt = 'Item image';
-    itemImage.src = u;
-    itemImage.style.display = 'block';
+    noImagePlaceholder.style.display = 'flex';
     itemImage.onerror = () => {
       itemImage.style.display = 'none';
       itemImage.removeAttribute('src');
+      itemImage.onerror = null;
+      itemImage.onload = null;
       noImagePlaceholder.style.display = 'flex';
     };
+    itemImage.onload = () => {
+      itemImage.onerror = null;
+      itemImage.onload = null;
+      noImagePlaceholder.style.display = 'none';
+      itemImage.style.display = 'block';
+    };
+    itemImage.src = u;
   } else {
     itemImage.style.display = 'none';
     itemImage.removeAttribute('src');
     itemImage.onerror = null;
+    itemImage.onload = null;
     noImagePlaceholder.style.display = 'flex';
   }
 }
