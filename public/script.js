@@ -25,8 +25,10 @@ const itemOriginalHeightEl = document.getElementById('itemOriginalHeight');
 const itemOriginalWeightEl = document.getElementById('itemOriginalWeight');
 const noImagePlaceholder = document.getElementById('noImagePlaceholder');
 const itemImage = document.getElementById('itemImage');
+const updateItemBtn = document.getElementById('updateItemBtn');
 
 let token = null;
+let originalItem = null;
 let currentOrg = null;
 let isScanning = false;
 let qrScanInterval = null;
@@ -301,6 +303,39 @@ function setItemImage(url) {
   }
 }
 
+const EDITABLE_KEYS = ['Description', 'OriginalLength', 'OriginalWidth', 'OriginalHeight', 'OriginalWeight'];
+const NUMERIC_KEYS = ['OriginalLength', 'OriginalWidth', 'OriginalHeight', 'OriginalWeight'];
+
+function getCurrentItemFields() {
+  const v = (el) => (el ? String(el.value || '').trim() : '');
+  return {
+    Description: v(itemDescriptionEl),
+    OriginalLength: v(itemOriginalLengthEl),
+    OriginalWidth: v(itemOriginalWidthEl),
+    OriginalHeight: v(itemOriginalHeightEl),
+    OriginalWeight: v(itemOriginalWeightEl)
+  };
+}
+
+function getChangedFields(orig, current) {
+  const out = {};
+  for (const k of EDITABLE_KEYS) {
+    const a = orig[k] != null ? String(orig[k]) : '';
+    const b = current[k] != null ? String(current[k]) : '';
+    if (a !== b) {
+      if (b === '') out[k] = null;
+      else if (NUMERIC_KEYS.includes(k) && isNumeric(b)) out[k] = parseFloat(b);
+      else out[k] = b;
+    }
+  }
+  return out;
+}
+
+function isNumeric(s) {
+  if (typeof s !== 'string' || !s) return false;
+  return !isNaN(parseFloat(s)) && isFinite(s);
+}
+
 function populateItemFields(item) {
   const v = (x) => (x == null || x === undefined ? '' : String(x));
   if (itemIdEl) itemIdEl.value = v(item.ItemId);
@@ -310,6 +345,14 @@ function populateItemFields(item) {
   if (itemOriginalHeightEl) itemOriginalHeightEl.value = v(item.OriginalHeight);
   if (itemOriginalWeightEl) itemOriginalWeightEl.value = v(item.OriginalWeight);
   setItemImage(item.ImageUrl);
+  originalItem = {
+    ItemId: item.ItemId,
+    Description: v(item.Description),
+    OriginalLength: v(item.OriginalLength),
+    OriginalWidth: v(item.OriginalWidth),
+    OriginalHeight: v(item.OriginalHeight),
+    OriginalWeight: v(item.OriginalWeight)
+  };
 }
 
 async function searchItem(item) {
@@ -339,6 +382,41 @@ async function searchItem(item) {
     showStatus(err.message || 'Search failed', 'error');
     if (itemInfo) itemInfo.style.display = 'none';
     itemInput.focus();
+  }
+}
+
+async function updateItem() {
+  if (!originalItem || !itemIdEl) return;
+  const itemId = String(itemIdEl.value || '').trim();
+  if (!itemId) {
+    showStatus('No item loaded.', 'error');
+    return;
+  }
+  const current = getCurrentItemFields();
+  const changed = getChangedFields(originalItem, current);
+  if (Object.keys(changed).length === 0) {
+    showStatus('No changes to save.', 'info');
+    return;
+  }
+  if (!updateItemBtn) return;
+  updateItemBtn.disabled = true;
+  const origHtml = updateItemBtn.innerHTML;
+  updateItemBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+  showStatus('Saving...', 'info');
+  try {
+    const res = await apiCall('save_item', { org: currentOrg, itemId, updates: changed });
+    if (!res.success) {
+      showStatus(res.error || 'Save failed', 'error');
+      return;
+    }
+    originalItem = { ...originalItem, ...current };
+    showStatus('Item updated successfully.', 'success');
+  } catch (err) {
+    console.error('Save error:', err);
+    showStatus(err.message || 'Save failed', 'error');
+  } finally {
+    updateItemBtn.disabled = false;
+    updateItemBtn.innerHTML = origHtml;
   }
 }
 
@@ -608,6 +686,7 @@ itemInput.addEventListener('keypress', (e) => {
 
 cameraBtn.addEventListener('click', openCamera);
 closeCameraBtn.addEventListener('click', closeCamera);
+updateItemBtn?.addEventListener('click', updateItem);
 errorModalCloseBtn?.addEventListener('click', hideErrorModal);
 errorModal?.addEventListener('click', (e) => {
   if (e.target === errorModal) hideErrorModal();

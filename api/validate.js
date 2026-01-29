@@ -142,6 +142,27 @@ async function handler(req, res) {
     return res.json({ success: true, item });
   }
 
+  if (action === 'save_item') {
+    const { itemId, updates } = req.body;
+    const requestOrg = req.body.org;
+    if (!itemId || !(itemId + '').trim()) {
+      return res.status(400).json({ success: false, error: 'ItemId required' });
+    }
+    if (!requestOrg || !(requestOrg + '').trim()) {
+      return res.status(400).json({ success: false, error: 'ORG required for item save' });
+    }
+    const id = (itemId + '').trim();
+    const payload = Object.assign({ ItemId: id }, updates || {});
+    const saveRes = await apiCall('POST', '/item-master/api/item-master/item/save', token, requestOrg, payload);
+    if (saveRes.error) {
+      return res.json({ success: false, error: saveRes.error });
+    }
+    if (saveRes.success === false && (saveRes.message || saveRes.error)) {
+      return res.json({ success: false, error: saveRes.message || saveRes.error });
+    }
+    return res.json({ success: true });
+  }
+
   return res.status(400).json({ error: 'Unknown action' });
 }
 
