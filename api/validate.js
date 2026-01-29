@@ -1,5 +1,5 @@
 // api/validate.js – Item Master Update
-import fetch from 'node-fetch';
+const fetch = require('node-fetch');
 
 const HA_WEBHOOK_URL = process.env.HA_WEBHOOK_URL || "http://sidmsmith.zapto.org:8123/api/webhook/manhattan_app_usage";
 const AUTH_HOST = "salep-auth.sce.manh.com";
@@ -58,7 +58,7 @@ async function apiCall(method, path, token, org, body = null) {
   return jsonResponse;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   console.log(`[API] ${req.method} ${req.url}`);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST');
@@ -145,4 +145,5 @@ export default async function handler(req, res) {
   return res.status(400).json({ error: 'Unknown action' });
 }
 
-export const config = { api: { bodyParser: true } };
+handler.config = { api: { bodyParser: true } };
+module.exports = handler;
