@@ -65,7 +65,7 @@ function getCommonMetadata(additionalMetadata = {}) {
     urlParamsObj[key] = value;
   }
   const currentTheme = localStorage.getItem('itemUpdateTheme') || 'manhattan';
-  const urlOrg = urlParamsObj.Organization || null;
+  const urlOrg = urlParamsObj.Organization || urlParamsObj.ORG || null;
 
   return {
     user_agent: ua,
@@ -201,8 +201,8 @@ async function apiCall(action, data = {}) {
 
 function checkAutoAuth() {
   const urlParams = new URLSearchParams(window.location.search);
-  const urlOrg = urlParams.get('Organization');
-  const urlItem = urlParams.get('Item');
+  const urlOrg = urlParams.get('Organization') || urlParams.get('ORG');
+  const urlItem = urlParams.get('Item') || urlParams.get('ItemId');
 
   if (urlItem && urlItem.trim()) {
     window.urlItem = urlItem.trim();
