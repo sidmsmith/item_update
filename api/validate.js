@@ -187,7 +187,8 @@ async function handler(req, res) {
       api_secret: CLOUDINARY_API_SECRET
     });
     const base = sanitizePublicId((itemId + '').trim());
-    const publicId = (base || 'item_' + Date.now()) + '_upload';
+    const epoch = Date.now();
+    const publicId = (base || 'item') + '_' + epoch;
     const filename = publicId + '.jpg';
     const folder = (CLOUDINARY_FOLDER || '').trim().replace(/^\/+|\/+$/g, '');
     const dataUri = fileData.startsWith('data:') ? fileData : `data:image/jpeg;base64,${fileData}`;
