@@ -26,6 +26,12 @@ const itemOriginalWeightEl = document.getElementById('itemOriginalWeight');
 const noImagePlaceholder = document.getElementById('noImagePlaceholder');
 const itemImage = document.getElementById('itemImage');
 const updateItemBtn = document.getElementById('updateItemBtn');
+const imageCameraBtn = document.getElementById('imageCameraBtn');
+const photoModal = document.getElementById('photoModal');
+const photoVideo = document.getElementById('photoVideo');
+const photoCanvas = document.getElementById('photoCanvas');
+const photoCaptureBtn = document.getElementById('photoCaptureBtn');
+const photoCloseBtn = document.getElementById('photoCloseBtn');
 
 let token = null;
 let originalItem = null;
@@ -33,6 +39,8 @@ let currentOrg = null;
 let isScanning = false;
 let qrScanInterval = null;
 let cameraModalHistoryState = null;
+let capturedImageDataUrl = null;
+let photoStream = null;
 
 const SESSION_STORAGE_KEY = 'item_update_session';
 let sessionId = null;
@@ -284,6 +292,7 @@ async function authenticate() {
 
 function setItemImage(url) {
   if (!itemImage || !noImagePlaceholder) return;
+  capturedImageDataUrl = null;
   const u = (url != null && url !== '') ? String(url).trim() : '';
   if (u) {
     noImagePlaceholder.style.display = 'none';
@@ -301,6 +310,56 @@ function setItemImage(url) {
     itemImage.onerror = null;
     noImagePlaceholder.style.display = 'flex';
   }
+}
+
+function setCapturedImage(dataUrl) {
+  if (!itemImage || !noImagePlaceholder) return;
+  capturedImageDataUrl = dataUrl;
+  noImagePlaceholder.style.display = 'none';
+  itemImage.alt = 'Captured photo';
+  itemImage.src = dataUrl;
+  itemImage.style.display = 'block';
+  itemImage.onerror = null;
+}
+
+function closePhotoModal() {
+  if (photoStream) {
+    photoStream.getTracks().forEach((t) => t.stop());
+    photoStream = null;
+  }
+  if (photoVideo) photoVideo.srcObject = null;
+  if (photoModal) photoModal.classList.remove('active');
+}
+
+async function openPhotoModal() {
+  if (!photoModal || !photoVideo) return;
+  try {
+    photoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    photoVideo.srcObject = photoStream;
+    photoModal.classList.add('active');
+    await photoVideo.play().catch(() => {});
+  } catch (e) {
+    console.error('Camera error:', e);
+    showStatus('Could not access camera.', 'error');
+  }
+}
+
+function capturePhoto() {
+  if (!photoVideo || !photoCanvas || !itemImage || !noImagePlaceholder) return;
+  const v = photoVideo;
+  if (v.readyState !== v.HAVE_ENOUGH_DATA || v.videoWidth === 0) return;
+  const w = v.videoWidth;
+  const h = v.videoHeight;
+  photoCanvas.width = w;
+  photoCanvas.height = h;
+  const ctx = photoCanvas.getContext('2d');
+  ctx.drawImage(v, 0, 0, w, h);
+  const dataUrl = photoCanvas.toDataURL('image/jpeg', 0.9);
+  setCapturedImage(dataUrl);
+  closePhotoModal();
 }
 
 const EDITABLE_KEYS = ['Description', 'OriginalLength', 'OriginalWidth', 'OriginalHeight', 'OriginalWeight'];
@@ -344,6 +403,7 @@ function populateItemFields(item) {
   if (itemOriginalWidthEl) itemOriginalWidthEl.value = v(item.OriginalWidth);
   if (itemOriginalHeightEl) itemOriginalHeightEl.value = v(item.OriginalHeight);
   if (itemOriginalWeightEl) itemOriginalWeightEl.value = v(item.OriginalWeight);
+  capturedImageDataUrl = null;
   setItemImage(item.ImageUrl);
   originalItem = {
     ItemId: item.ItemId,
@@ -686,6 +746,9 @@ itemInput.addEventListener('keypress', (e) => {
 
 cameraBtn.addEventListener('click', openCamera);
 closeCameraBtn.addEventListener('click', closeCamera);
+imageCameraBtn?.addEventListener('click', openPhotoModal);
+photoCaptureBtn?.addEventListener('click', capturePhoto);
+photoCloseBtn?.addEventListener('click', closePhotoModal);
 updateItemBtn?.addEventListener('click', updateItem);
 errorModalCloseBtn?.addEventListener('click', hideErrorModal);
 errorModal?.addEventListener('click', (e) => {
@@ -697,6 +760,9 @@ modalBackdrop?.addEventListener('click', () => {
 });
 cameraModal.addEventListener('click', (e) => {
   if (e.target === cameraModal) closeCamera();
+});
+photoModal?.addEventListener('click', (e) => {
+  if (e.target === photoModal) closePhotoModal();
 });
 
 window.addEventListener('popstate', (event) => {
