@@ -32,6 +32,7 @@ const photoVideo = document.getElementById('photoVideo');
 const photoCanvas = document.getElementById('photoCanvas');
 const photoCaptureBtn = document.getElementById('photoCaptureBtn');
 const photoCloseBtn = document.getElementById('photoCloseBtn');
+const previewOverlay = document.getElementById('previewOverlay');
 
 let token = null;
 let originalItem = null;
@@ -293,6 +294,7 @@ async function authenticate() {
 function setItemImage(url) {
   if (!itemImage || !noImagePlaceholder) return;
   capturedImageDataUrl = null;
+  if (previewOverlay) previewOverlay.style.display = 'none';
   const u = (url != null && url !== '') ? String(url).trim() : '';
   if (u) {
     noImagePlaceholder.style.display = 'none';
@@ -320,6 +322,7 @@ function setCapturedImage(dataUrl) {
   itemImage.src = dataUrl;
   itemImage.style.display = 'block';
   itemImage.onerror = null;
+  if (previewOverlay) previewOverlay.style.display = 'block';
 }
 
 function closePhotoModal() {
