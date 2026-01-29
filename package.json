@@ -9,6 +9,7 @@
   "description": "Item Master Update App - Item lookup and update (item APIs to be added)",
   "main": "server.js",
   "dependencies": {
+    "cloudinary": "^2.5.1",
     "express": "^5.1.0",
     "node-fetch": "^2.6.7"
   },

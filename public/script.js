@@ -414,7 +414,8 @@ function populateItemFields(item) {
     OriginalLength: v(item.OriginalLength),
     OriginalWidth: v(item.OriginalWidth),
     OriginalHeight: v(item.OriginalHeight),
-    OriginalWeight: v(item.OriginalWeight)
+    OriginalWeight: v(item.OriginalWeight),
+    ImageUrl: v(item.ImageUrl)
   };
 }
 
@@ -457,7 +458,8 @@ async function updateItem() {
   }
   const current = getCurrentItemFields();
   const changed = getChangedFields(originalItem, current);
-  if (Object.keys(changed).length === 0) {
+  const hasNewImage = !!capturedImageDataUrl;
+  if (Object.keys(changed).length === 0 && !hasNewImage) {
     showStatus('No changes to save.', 'info');
     return;
   }
@@ -465,14 +467,33 @@ async function updateItem() {
   updateItemBtn.disabled = true;
   const origHtml = updateItemBtn.innerHTML;
   updateItemBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-  showStatus('Saving...', 'info');
+  showStatus(hasNewImage ? 'Uploading image...' : 'Saving...', 'info');
   try {
+    if (hasNewImage) {
+      const up = await apiCall('upload_image', {
+        org: currentOrg,
+        itemId,
+        fileData: capturedImageDataUrl
+      });
+      if (!up.success) {
+        showStatus(up.error || 'Image upload failed', 'error');
+        return;
+      }
+      if (up.imageUrl) changed.ImageUrl = up.imageUrl;
+      showStatus('Saving...', 'info');
+    }
     const res = await apiCall('save_item', { org: currentOrg, itemId, updates: changed });
     if (!res.success) {
       showStatus(res.error || 'Save failed', 'error');
       return;
     }
     originalItem = { ...originalItem, ...current };
+    if (changed.ImageUrl) {
+      originalItem.ImageUrl = changed.ImageUrl;
+      setItemImage(changed.ImageUrl);
+      capturedImageDataUrl = null;
+      if (previewOverlay) previewOverlay.style.display = 'none';
+    }
     showStatus('Item updated successfully.', 'success');
   } catch (err) {
     console.error('Save error:', err);

@@ -1,7 +1,13 @@
 // api/validate.js – Item Master Update
 const fetch = require('node-fetch');
+const cloudinary = require('cloudinary').v2;
 
 const HA_WEBHOOK_URL = process.env.HA_WEBHOOK_URL || "http://sidmsmith.zapto.org:8123/api/webhook/manhattan_app_usage";
+const CLOUDINARY_PREFIX = process.env.CLOUDINARY_PREFIX || '';
+const CLOUDINARY_FOLDER = process.env.CLOUDINARY_FOLDER || '';
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || '';
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || '';
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || '';
 const AUTH_HOST = "salep-auth.sce.manh.com";
 const API_HOST = "salep.sce.manh.com";
 const CLIENT_ID = "omnicomponent.1.0.0";
@@ -56,6 +62,23 @@ async function apiCall(method, path, token, org, body = null) {
     return { error: text, success: false };
   }
   return jsonResponse;
+}
+
+function buildImageUrl(prefix, folder, filename) {
+  if (!filename || !String(filename).trim()) return '';
+  const raw = (s) => (s == null ? '' : String(s).trim());
+  let p = raw(prefix).replace(/\/+$/, '');
+  let f = raw(folder).replace(/^\/+|\/+$/g, '');
+  let fn = raw(filename).replace(/^\/+/, '');
+  const parts = [];
+  if (p) parts.push(p);
+  if (f) parts.push(f);
+  if (fn) parts.push(fn);
+  return parts.join('/').replace(/([^:])\/\/+/g, '$1/');
+}
+
+function sanitizePublicId(s) {
+  return (s || '').replace(/[^a-zA-Z0-9_.-]/g, '_');
 }
 
 async function handler(req, res) {
@@ -140,6 +163,43 @@ async function handler(req, res) {
       return res.json({ success: false, error: 'Item not found' });
     }
     return res.json({ success: true, item });
+  }
+
+  if (action === 'upload_image') {
+    const requestOrg = req.body.org;
+    const itemId = req.body.itemId;
+    const fileData = req.body.fileData;
+    if (!requestOrg || !(requestOrg + '').trim()) {
+      return res.status(400).json({ success: false, error: 'ORG required for image upload' });
+    }
+    if (!itemId || !(itemId + '').trim()) {
+      return res.status(400).json({ success: false, error: 'ItemId required' });
+    }
+    if (!fileData || typeof fileData !== 'string') {
+      return res.status(400).json({ success: false, error: 'fileData (base64) required' });
+    }
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ success: false, error: 'Cloudinary env not configured' });
+    }
+    cloudinary.config({
+      cloud_name: CLOUDINARY_CLOUD_NAME,
+      api_key: CLOUDINARY_API_KEY,
+      api_secret: CLOUDINARY_API_SECRET
+    });
+    const base = sanitizePublicId((itemId + '').trim());
+    const publicId = base || 'item_' + Date.now();
+    const filename = publicId + '.jpg';
+    const folder = (CLOUDINARY_FOLDER || '').trim().replace(/^\/+|\/+$/g, '');
+    const dataUri = fileData.startsWith('data:') ? fileData : `data:image/jpeg;base64,${fileData}`;
+    try {
+      const uploadOpts = { folder: folder || undefined, public_id: publicId };
+      const result = await cloudinary.uploader.upload(dataUri, uploadOpts);
+      const imageUrl = buildImageUrl(CLOUDINARY_PREFIX, CLOUDINARY_FOLDER, filename);
+      return res.json({ success: true, imageUrl: imageUrl || (result.secure_url || result.url) });
+    } catch (e) {
+      console.warn('[upload_image]', e);
+      return res.json({ success: false, error: e.message || 'Cloudinary upload failed' });
+    }
   }
 
   if (action === 'save_item') {
