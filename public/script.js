@@ -159,7 +159,7 @@ async function trackEvent(eventName, metadata = {}) {
     const fullMetadata = getCommonMetadata(metadata);
     await apiCall('ha-track', { event_name: eventName, metadata: fullMetadata });
   } catch (e) {
-    console.warn('[HA] Failed to track event:', e);
+    console.warn('[usage] Failed to track event:', e);
   }
 }
 

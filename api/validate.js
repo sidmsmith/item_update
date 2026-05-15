@@ -2,7 +2,31 @@
 const fetch = require('node-fetch');
 const cloudinary = require('cloudinary').v2;
 
-const HA_WEBHOOK_URL = process.env.HA_WEBHOOK_URL || "http://sidmsmith.zapto.org:8123/api/webhook/manhattan_app_usage";
+const USAGE_INGEST_URL = (process.env.MANHATTAN_USAGE_INGEST_URL || '').trim();
+const USAGE_INGEST_SECRET = (process.env.MANHATTAN_USAGE_INGEST_SECRET || '').trim();
+const APP_NAME = 'item-update';
+const APP_VERSION = '1.0.1';
+
+async function forwardUsageEvent(payload) {
+  if (!USAGE_INGEST_URL) {
+    console.warn('[usage] MANHATTAN_USAGE_INGEST_URL not set; event not recorded');
+    return;
+  }
+  const headers = { 'Content-Type': 'application/json' };
+  if (USAGE_INGEST_SECRET) {
+    headers.Authorization = `Bearer ${USAGE_INGEST_SECRET}`;
+  }
+  try {
+    await fetch(USAGE_INGEST_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      timeout: 8000,
+    });
+  } catch (e) {
+    console.warn('[usage] Forward failed:', e.message);
+  }
+}
 const CLOUDINARY_PREFIX = process.env.CLOUDINARY_PREFIX || '';
 const CLOUDINARY_FOLDER = process.env.CLOUDINARY_FOLDER || '';
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || '';
@@ -98,24 +122,15 @@ async function handler(req, res) {
 
   if (action === 'ha-track') {
     const { event_name, metadata } = req.body;
-    try {
-      const payload = {
-        event_name,
-        app_name: 'item-update',
-        app_version: '1.0.0',
-        ...metadata,
-        timestamp: new Date().toISOString()
-      };
-      await fetch(HA_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      return res.json({ success: true });
-    } catch (error) {
-      console.warn('[HA] Failed to track event:', error);
-      return res.json({ success: true });
-    }
+    const payload = {
+      event_name,
+      app_name: APP_NAME,
+      app_version: APP_VERSION,
+      ...(metadata || {}),
+      timestamp: new Date().toISOString(),
+    };
+    await forwardUsageEvent(payload);
+    return res.json({ success: true });
   }
 
   if (action === 'auth') {
